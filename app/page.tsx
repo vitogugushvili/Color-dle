@@ -6,6 +6,12 @@ import {
   findColorPosition,
   isWithinProximity,
 } from "./utils/colorUtils";
+import {
+  loadGameState,
+  saveGameState,
+  hasSeenInstructionsToday,
+  markInstructionsAsSeen,
+} from "./utils/storageUtils";
 
 interface Guess {
   color: string;
@@ -21,17 +27,50 @@ export default function Colordle() {
     "playing"
   );
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
-  const [showHowToPlay, setShowHowToPlay] = useState(true); // Show on load
+  const [showHowToPlay, setShowHowToPlay] = useState(false); // Will be set based on localStorage
   const [celebrating, setCelebrating] = useState(false);
   const [animateGuess, setAnimateGuess] = useState(false);
   const [showAnswer, setShowAnswer] = useState(false);
   const [jumpingAnswer, setJumpingAnswer] = useState(false);
   const [movingToCenter, setMovingToCenter] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   // Hardcoded daily color and clues
   const targetColor = "#FFB3E0";
   const clues = ["Flamingo", "Hello Kitty", "Cotton Candy"];
   const targetPosition = findColorPosition(colors, targetColor);
+
+  // Load game state from localStorage on mount
+  useEffect(() => {
+    const savedState = loadGameState();
+
+    if (savedState) {
+      // Restore saved game state
+      setGuesses(savedState.guesses);
+      setCurrentClue(savedState.currentClue);
+      setGameState(savedState.gameStatus);
+
+      // Show instructions only if not seen today
+      setShowHowToPlay(!savedState.hasSeenInstructions);
+    } else {
+      // New day or first visit - show instructions
+      setShowHowToPlay(!hasSeenInstructionsToday());
+    }
+
+    setIsLoaded(true);
+  }, []);
+
+  // Save game state to localStorage whenever it changes
+  useEffect(() => {
+    if (!isLoaded) return; // Don't save during initial load
+
+    saveGameState({
+      guesses,
+      currentClue,
+      gameStatus: gameState,
+      hasSeenInstructions: hasSeenInstructionsToday(),
+    });
+  }, [guesses, currentClue, gameState, isLoaded]);
 
   // Effect to trigger animations when game is lost
   useEffect(() => {
@@ -148,7 +187,9 @@ export default function Colordle() {
                 </div>
               </div>
               <button
-                onClick={() => setShowHowToPlay(true)}
+                onClick={() => {
+                  setShowHowToPlay(true);
+                }}
                 className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200 hover:scale-110"
                 title="How to Play"
               >
@@ -315,7 +356,10 @@ export default function Colordle() {
         {showHowToPlay && (
           <div
             className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
-            onClick={() => setShowHowToPlay(false)}
+            onClick={() => {
+              setShowHowToPlay(false);
+              markInstructionsAsSeen();
+            }}
           >
             <div
               className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 max-w-md w-full"
@@ -358,7 +402,10 @@ export default function Colordle() {
                 </p>
               </div>
               <button
-                onClick={() => setShowHowToPlay(false)}
+                onClick={() => {
+                  setShowHowToPlay(false);
+                  markInstructionsAsSeen();
+                }}
                 className="mt-6 w-full py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded font-medium hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
               >
                 Start Playing
